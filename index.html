@@ -252,11 +252,14 @@ const SRC_COLORS = {
   'Inma Offer':'#f87171','Unknown':'#4a5068',
 };
 const PIPE_COLORS = {
-  Qualified:'#3b82f6',Pitching:'#14b8a6',Negotiation:'#f59e0b',
-  Nurturing:'#a78bfa',Commitment:'#f97316','Closed Won':'#22c55e','Closed Lost':'#ef4444'
+  'Qualified':'#3b82f6','Pitching':'#14b8a6','Negotiation':'#f59e0b',
+  'Nurturing':'#a78bfa','Commitment':'#f97316','Closed Won':'#22c55e','Closed Lost':'#ef4444',
+  'Renewal Closed - Won':'#16a34a','Renewal Approaching':'#06b6d4','Active Customers':'#8b5cf6',
+  'Renewal Identification (7-3 days)':'#d946ef','Contacted':'#64748b','Price Proposal':'#f97316',
+  'Contract / Payment Pending':'#eab308','Renewal Closed - Lost':'#dc2626','Pending / Unresponsive':'#6b7280'
 };
 const STATES  = ['New Lead','Pick Up','Successfully Contacted','RNR1','RNR2','RNR3','RNR4','RNR5','RNR6','Converted','Not Converted'];
-const STAGES  = ['Qualified','Pitching','Negotiation','Nurturing','Commitment','Closed Won','Closed Lost'];
+const STAGES  = ['Qualified','Pitching','Negotiation','Nurturing','Commitment','Closed Won','Closed Lost','Renewal Closed - Won','Renewal Approaching','Active Customers','Renewal Identification (7-3 days)','Contacted','Price Proposal','Contract / Payment Pending','Renewal Closed - Lost','Pending / Unresponsive'];
 const SEC_TITLES = {overview:'Overview',social:'Platforms',states:'Lead States',pipeline:'Pipeline',team:'Team',trend:'Monthly Trend',campaigns:'Campaigns'};
 
 function bc(s){
@@ -348,7 +351,7 @@ function render(){
         <div class="metric blue"><div class="m-lbl">Total Leads</div><div class="m-val">${total.toLocaleString()}</div><div class="m-sub">Layout: Omni</div></div>
         <div class="metric teal"><div class="m-lbl">POS</div><div class="m-val">${pos.toLocaleString()}</div><div class="m-sub">${total?Math.round(pos/total*100):0}% of total</div></div>
         <div class="metric amber"><div class="m-lbl">Financing</div><div class="m-val">${fin.toLocaleString()}</div><div class="m-sub">${total?Math.round(fin/total*100):0}% of total</div></div>
-        <div class="metric green"><div class="m-lbl">Converted</div><div class="m-val">${conv.toLocaleString()}</div><div class="m-sub">Rate: ${total?Math.round(conv/total*100):0}%</div></div>
+        <div class="metric green"><div class="m-lbl">Converted</div><div class="m-val">${conv.toLocaleString()}</div><div class="m-sub">Rate: ${total?Math.round(conv/total*100):0}%</div></div><div class="metric" style="--c:var(--green)"><div class="m-lbl">Closed Won (Deals)</div><div class="m-val" style="color:var(--green)">${(d.closedWon||0).toLocaleString()}</div><div class="m-sub">from Opportunities</div></div>
         <div class="metric red"><div class="m-lbl">Not Converted</div><div class="m-val">${nc.toLocaleString()}</div><div class="m-sub">${total?Math.round(nc/total*100):0}%</div></div>
       </div>
       <div class="g2">
@@ -444,28 +447,35 @@ function render(){
 
   // PIPELINE
   else if(activeSec==='pipeline'){
-    // Show debug info if all stages are 0
-    const stageTotal = STAGES.reduce((s,k)=>s+(byStage[k]||0),0);
-    const debugInfo = stageTotal===0 ? `
-      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--r);padding:12px 14px;margin-bottom:14px;font-size:12px;color:var(--amber)">
-        ⚠️ Pipeline stages show 0. Stage values found in Zoho: <strong>${Object.keys(stageDebug).join(', ')||'none'}</strong>
-        <br/>Expected: Qualified, Pitching, Negotiation, Nurturing, Commitment, Closed Won, Closed Lost
-      </div>` : '';
+    // Use dynamic stages from actual Deals data
+    const activeStages = Object.entries(byStage).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    const cw = byStage['Closed Won']||0;
+    const cl = byStage['Closed Lost']||0;
+    const activeDeals = Object.entries(byStage).filter(([s,v])=>v>0&&s!=='Closed Won'&&s!=='Closed Lost').reduce((s,[,v])=>s+v,0);
+
     document.getElementById('content').innerHTML=`
-      ${debugInfo}
+      <div class="metrics">
+        <div class="metric blue"><div class="m-lbl">Total Deals</div><div class="m-val">${(d.dealsTotal||0).toLocaleString()}</div><div class="m-sub">from Opportunities</div></div>
+        <div class="metric green"><div class="m-lbl">Closed Won</div><div class="m-val">${cw.toLocaleString()}</div><div class="m-sub">${d.dealsTotal?Math.round(cw/d.dealsTotal*100):0}% win rate</div></div>
+        <div class="metric red"><div class="m-lbl">Closed Lost</div><div class="m-val">${cl.toLocaleString()}</div><div class="m-sub">${d.dealsTotal?Math.round(cl/d.dealsTotal*100):0}%</div></div>
+        <div class="metric teal"><div class="m-lbl">Active Deals</div><div class="m-val">${activeDeals.toLocaleString()}</div><div class="m-sub">in pipeline</div></div>
+      </div>
       <div class="card" style="margin-bottom:14px">
-        <div class="ct"><span class="ct-dot" style="background:var(--amber)"></span>Standard Pipeline</div>
-        <div class="pipe-grid">
-          ${STAGES.map(s=>`<div class="pipe-cell"><div class="pv" style="color:${PIPE_COLORS[s]}">${(byStage[s]||0).toLocaleString()}</div><div class="pl">${s}</div></div>`).join('')}
+        <div class="ct"><span class="ct-dot" style="background:var(--amber)"></span>Pipeline Stages</div>
+        <div class="pipe-grid" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr))">
+          ${activeStages.map(([s,v])=>`<div class="pipe-cell"><div class="pv" style="color:${PIPE_COLORS[s]||'#8b92a8'}">${v.toLocaleString()}</div><div class="pl">${s}</div></div>`).join('')}
         </div>
       </div>
       <div class="card">
         <div class="ct"><span class="ct-dot" style="background:var(--green)"></span>Pipeline Chart</div>
-        <div style="position:relative;height:300px"><canvas id="pipeChart" role="img" aria-label="Pipeline stages chart"></canvas></div>
+        <div style="position:relative;height:${Math.max(activeStages.length*38+80,300)}px"><canvas id="pipeChart" role="img" aria-label="Pipeline stages chart"></canvas></div>
       </div>`;
     setTimeout(()=>{
       const ctx=document.getElementById('pipeChart');
-      if(ctx) charts.pipeChart=new Chart(ctx,{type:'bar',data:{labels:STAGES,datasets:[{label:'Leads',data:STAGES.map(s=>byStage[s]||0),backgroundColor:STAGES.map(s=>PIPE_COLORS[s]),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.y.toLocaleString()} leads`}}},scales:{x:{ticks:{color:'#8b92a8',font:{size:11}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#8b92a8'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+      const labels=activeStages.map(([s])=>s);
+      const vals=activeStages.map(([,v])=>v);
+      const colors=activeStages.map(([s])=>PIPE_COLORS[s]||'#8b92a8');
+      if(ctx) charts.pipeChart=new Chart(ctx,{type:'bar',indexAxis:'y',data:{labels,datasets:[{label:'Deals',data:vals,backgroundColor:colors,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.parsed.x.toLocaleString()} deals`}}},scales:{x:{ticks:{color:'#8b92a8'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#8b92a8',font:{size:11}},grid:{display:false}}}}});
     },50);
   }
 

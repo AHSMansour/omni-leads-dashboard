@@ -569,52 +569,58 @@ function buildCampaignsUI(data){
 
   const top = camps[0];
   const topConv = camps.slice().sort((a,b)=>b.closedWonRate-a.closedWonRate)[0];
-  const totalCW = camps.reduce((s,c)=>s+c.closedWon,0);
+  const totalCW  = camps.reduce((s,c)=>s+(c.closedWon||0),0);
+  const totalDls = camps.reduce((s,c)=>s+(c.dealsCreated||0),0);
   const allSources = [...new Set(camps.flatMap(c=>Object.keys(c.bySource)))].sort();
-
-  // Source color helper
   const SC = {'Snapchat':'#f5e642','TikTok':'#3b82f6','Meta Ads':'#4267B2','Facebook&Instagram':'#4267B2','META':'#4267B2','Referral':'#14b8a6','WhatsApp Ads':'#22c55e','WhatsApp Organic':'#16a34a','Google Ads':'#ef4444','Omni Website':'#a78bfa','Unknown':'#4a5068'};
 
   document.getElementById('content').innerHTML=`
     <div class="metrics">
-      <div class="metric blue"><div class="m-lbl">Total Campaigns</div><div class="m-val">${data.campaignCount}</div><div class="m-sub">${data.total.toLocaleString()} leads</div></div>
-      <div class="metric teal"><div class="m-lbl">Top Volume</div><div class="m-val" style="font-size:13px;line-height:1.3">${top.name.substring(0,28)}${top.name.length>28?'…':''}</div><div class="m-sub">${top.total.toLocaleString()} leads</div></div>
-      <div class="metric green"><div class="m-lbl">Best Conv. Rate</div><div class="m-val">${topConv.closedWonRate}%</div><div class="m-sub">${topConv.name.substring(0,24)}${topConv.name.length>24?'…':''}</div></div>
-      <div class="metric amber"><div class="m-lbl">Total Closed Won</div><div class="m-val">${totalCW.toLocaleString()}</div><div class="m-sub">across all campaigns</div></div>
+      <div class="metric blue"><div class="m-lbl">Total Campaigns</div><div class="m-val">${data.campaignCount}</div><div class="m-sub">${data.total.toLocaleString()} leads total</div></div>
+      <div class="metric teal"><div class="m-lbl">Top by Volume</div><div class="m-val" style="font-size:13px;line-height:1.3">${top.name.substring(0,26)}${top.name.length>26?'…':''}</div><div class="m-sub">${top.total.toLocaleString()} leads</div></div>
+      <div class="metric purple"><div class="m-lbl">Converted → Deals</div><div class="m-val">${totalDls.toLocaleString()}</div><div class="m-sub">${data.total?Math.round(totalDls/data.total*100):0}% of leads</div></div>
+      <div class="metric green"><div class="m-lbl">Total Closed Won</div><div class="m-val">${totalCW.toLocaleString()}</div><div class="m-sub">Best: ${topConv.closedWonRate}% — ${topConv.name.substring(0,18)}…</div></div>
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <div class="ct"><span class="ct-dot" style="background:var(--blue)"></span>Campaign Performance</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="ct" style="margin:0"><span class="ct-dot" style="background:var(--blue)"></span>Campaign Performance</div>
+        <div style="display:flex;gap:16px;font-size:11px;color:var(--text2)">
+          <span><span style="color:var(--purple)">●</span> Converted = leads moved to Deals (Opportunities)</span>
+          <span><span style="color:var(--green)">●</span> Closed Won = Deals at Closed Won stage</span>
+        </div>
+      </div>
       <div style="overflow-x:auto">
-        <table class="tbl" style="min-width:780px">
+        <table class="tbl" style="min-width:960px">
           <thead>
             <tr>
-              <th style="min-width:220px">Campaign</th>
-              <th class="num">Total</th>
+              <th style="min-width:200px">Campaign</th>
+              <th class="num">Leads</th>
               <th class="num">POS</th>
               <th class="num">Financing</th>
-              ${allSources.map(s=>`<th class="num" style="font-size:10px">${s}</th>`).join('')}
-              <th class="num">Closed Won</th>
-              <th class="num">Conv. Rate</th>
-              <th style="min-width:100px">Rate Bar</th>
+              ${allSources.map(src=>`<th class="num" style="font-size:10px">${src}</th>`).join('')}
+              <th class="num" style="color:var(--purple)">Converted<br/><span style="font-size:9px;font-weight:400">(to Deal)</span></th>
+              <th class="num" style="color:var(--text2)">Deal%</th>
+              <th class="num" style="color:var(--green)">Closed Won</th>
+              <th class="num">CW Rate</th>
+              <th style="min-width:80px"></th>
             </tr>
           </thead>
           <tbody>
             ${camps.map(c=>{
-              const rateColor = c.closedWonRate>=10?'var(--green)':c.closedWonRate>=5?'var(--amber)':'var(--red)';
+              const cwColor = c.closedWonRate>=10?'var(--green)':c.closedWonRate>=5?'var(--amber)':'var(--red)';
+              const drColor = c.dealRate>=20?'var(--blue)':c.dealRate>=10?'var(--teal)':'var(--text2)';
               return `<tr>
-                <td style="font-size:12px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.name}">${c.name}</td>
+                <td style="font-size:12px;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.name}">${c.name}</td>
                 <td class="num">${c.total.toLocaleString()}</td>
-                <td class="num" style="color:var(--blue)">${c.pos.toLocaleString()}</td>
-                <td class="num" style="color:var(--teal)">${c.financing.toLocaleString()}</td>
-                ${allSources.map(s=>`<td class="num" style="color:${SC[s]||'#8b92a8'}">${c.bySource[s]||'—'}</td>`).join('')}
-                <td class="num" style="color:var(--green)">${c.closedWon.toLocaleString()}</td>
-                <td class="num" style="color:${rateColor};font-weight:600">${c.closedWonRate}%</td>
-                <td>
-                  <div style="background:var(--bg3);border-radius:3px;height:6px;overflow:hidden">
-                    <div style="width:${Math.min(c.closedWonRate*5,100)}%;height:6px;border-radius:3px;background:${rateColor};transition:width .4s"></div>
-                  </div>
-                </td>
+                <td class="num" style="color:var(--blue)">${c.pos}</td>
+                <td class="num" style="color:var(--teal)">${c.financing}</td>
+                ${allSources.map(src=>`<td class="num" style="color:${SC[src]||'#8b92a8'}">${c.bySource[src]||'—'}</td>`).join('')}
+                <td class="num" style="color:var(--purple);font-weight:600">${c.dealsCreated||0}</td>
+                <td class="num" style="color:${drColor}">${c.dealRate||0}%</td>
+                <td class="num" style="color:var(--green);font-weight:600">${c.closedWon||0}</td>
+                <td class="num" style="color:${cwColor};font-weight:700">${c.closedWonRate}%</td>
+                <td><div style="background:var(--bg3);border-radius:3px;height:6px;overflow:hidden"><div style="width:${Math.min(c.closedWonRate*5,100)}%;height:6px;border-radius:3px;background:${cwColor}"></div></div></td>
               </tr>`;
             }).join('')}
           </tbody>

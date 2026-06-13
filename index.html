@@ -410,10 +410,8 @@ function render(){
     const allSources = [...new Set((CAMPS.campaigns||[]).flatMap(c=>Object.keys(c.bySource||{})))].sort();
     const allStates  = STATES.filter(st=>camps.some(c=>(c.byState||{})[st]>0));
     // Opportunity stages — collect from all campaigns' deal stages
-    const OPP_STAGES = ['Qualified','Pitching','Negotiation','Nurturing','Commitment','Closed Won','Closed Lost',
-      'Renewal Closed - Won','Active Customers','Renewal Identification (7-3 days)','Contacted',
-      'Price Proposal','Contract / Payment Pending','Renewal Closed - Lost','Pending / Unresponsive','Renewal Approaching'];
-    const activeOppStages = OPP_STAGES.filter(s=>(byStage[s]||0)>0);
+    const OPP_STAGES = ['Qualified','Pitching','Negotiation','Nurturing','Commitment','Closed Won','Closed Lost'];
+    const activeOppStages = OPP_STAGES;
 
     // Totals
     const totLeads = camps.reduce((s,c)=>s+c.total,0);
@@ -481,7 +479,7 @@ function render(){
                 <td class="num" style="font-weight:600;color:var(--blue)">${fmtN(c.total)}</td>
                 ${allSources.map(s=>cell((c.bySource||{})[s]||0)).join('')}
                 ${allStates.map(s=>cell((c.byState||{})[s]||0)).join('')}
-                ${activeOppStages.map(s=>cell((byStage[s]||0)>0?((c.dealsCreated||0)>0?Math.round((c.dealsCreated||0)*((byStage[s]||0)/(d.dealsTotal||1))):0):0)).join('')}
+                ${activeOppStages.map(s=>cell((c.byStage||{})[s]||0)).join('')}
                 <td class="num" style="color:var(--purple);font-weight:600">${fmtN(c.dealsCreated||0)}</td>
                 <td class="num" style="color:var(--green);font-weight:600">${fmtN(c.closedWon||0)}</td>
                 <td>
@@ -499,7 +497,7 @@ function render(){
               <td style="color:var(--blue)">${fmtN(totLeads)}</td>
               ${allSources.map(s=>`<td>${fmtN(srcTotals[s]||0)}</td>`).join('')}
               ${allStates.map(s=>`<td>${fmtN(stateTotals[s]||0)}</td>`).join('')}
-              ${activeOppStages.map(s=>`<td>${fmtN(byStage[s]||0)}</td>`).join('')}
+              ${activeOppStages.map(s=>`<td style="font-weight:600">${fmtN(camps.reduce((t,c)=>t+((c.byStage||{})[s]||0),0))}</td>`).join('')}
               <td style="color:var(--purple)">${fmtN(totDls)}</td>
               <td style="color:var(--green)">${fmtN(totCW)}</td>
               <td><span class="rate-pct" style="color:${rateColor(totCWR)}">${totCWR}%</span></td>

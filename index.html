@@ -223,6 +223,10 @@ tfoot td:first-child{text-align:left;color:var(--blue)}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       Trend
     </div>
+    <div class="ni" data-sec="closedDeals">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Closed Deals
+    </div>
   </nav>
   <div class="sb-bot">
     <button class="btn-primary" onclick="loadData()">
@@ -286,7 +290,7 @@ tfoot td:first-child{text-align:left;color:var(--blue)}
 
 <script>
 const BASE = "https://zoho-crm-proxy.onrender.com";
-let RAW = null, CAMPS = null, charts = {}, activeSec = 'overview';
+let RAW = null, CAMPS = null, CLOSED = null, charts = {}, activeSec = 'overview';
 let campFilter = '';
 
 const SRC_COLORS = {
@@ -306,7 +310,7 @@ const PIPE_COLORS = {
   'Renewal Approaching':'#06b6d4',
 };
 const STATES = ['New Lead','Pick Up','Successfully Contacted','RNR1','RNR2','RNR3','RNR4','RNR5','RNR6','Converted','Not Converted'];
-const SEC_TITLES = {overview:'Overview',campaigns:'Campaigns',social:'Platforms',states:'Lead States',pipeline:'Pipeline',team:'Team',trend:'Monthly Trend'};
+const SEC_TITLES = {overview:'Overview',campaigns:'Campaigns',social:'Platforms',states:'Lead States',pipeline:'Pipeline',team:'Team',trend:'Monthly Trend',closedDeals:'Closed Deals'};
 
 function bc(s){ return s==='Converted'?'b-conv':s==='Not Converted'?'b-nc':s==='New Lead'?'b-new':s==='Pick Up'?'b-pick':s==='Successfully Contacted'?'b-sc':'b-rnr'; }
 function rateColor(r){ return r>=10?'var(--green)':r>=5?'var(--amber)':'var(--red)'; }
@@ -359,13 +363,15 @@ async function loadData(){
   document.getElementById('errBox').style.display='none';
   try{
     const qs = buildParams();
-    const [r1,r2] = await Promise.all([
+    const [r1,r2,r3] = await Promise.all([
       fetch(BASE+'/stats'+qs),
-      fetch(BASE+'/campaigns'+qs)
+      fetch(BASE+'/campaigns'+qs),
+      fetch(BASE+'/closed-deals'+qs)
     ]);
     if(!r1.ok) throw new Error('Stats HTTP '+r1.status);
     RAW = await r1.json();
     CAMPS = await r2.json();
+    CLOSED = r3.ok ? await r3.json() : null;
     // Owners - multi select
     const owners=Object.keys(RAW.byOwner||{}).sort((a,b)=>RAW.byOwner[b]-RAW.byOwner[a]);
     populateOwnerList(owners);
@@ -719,6 +725,69 @@ function render(){
   }
 
   // ── TREND ────────────────────────────────────────────────────────────────
+  else if(activeSec==='closedDeals'){
+    if(!CLOSED){ document.getElementById('content').innerHTML='<div class="loading"><span class="spin"></span>Loading closed deals…</div>'; return; }
+    const cd=CLOSED, total=cd.total||0, camp=cd.campaign||0, self=cd.self||0;
+    const campPct=cd.campaignPct||0, selfPct=cd.selfPct||0;
+    const owners=cd.byOwner||[];
+    document.getElementById('content').innerHTML=`
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="k-lbl">Total Closed Won</div><div class="k-val" style="color:var(--green)">${fmtN(total)}</div><div class="k-sub">from Opportunities</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="k-lbl">Campaign</div><div class="k-val" style="color:var(--blue)">${fmtN(camp)}</div><div class="k-sub">${campPct}% of closed</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="k-lbl">Self Prospecting</div><div class="k-val" style="color:var(--amber)">${fmtN(self)}</div><div class="k-sub">${selfPct}% of closed</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--purple)"></div><div class="k-lbl">Top Performer</div><div class="k-val" style="color:var(--purple);font-size:15px">${cd.topEmployee||'—'}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card">
+          <div class="card-hd"><div class="card-title"><span class="dot" style="background:var(--blue)"></span>Source Breakdown</div></div>
+          <table class="tbl" style="margin-top:10px">
+            <thead><tr><th>Source</th><th>Count</th><th>%</th></tr></thead>
+            <tbody>
+              <tr><td><span class="badge" style="background:rgba(59,130,246,.15);color:#3b82f6">Campaign</span></td><td>${fmtN(camp)}</td><td>${campPct}%</td></tr>
+              <tr><td><span class="badge" style="background:rgba(245,158,11,.15);color:#f59e0b">Self Prospecting</span></td><td>${fmtN(self)}</td><td>${selfPct}%</td></tr>
+              <tr style="border-top:1px solid var(--border-md);font-weight:600"><td>Total</td><td>${fmtN(total)}</td><td>100%</td></tr>
+            </tbody>
+          </table>
+          <div style="position:relative;height:220px;margin-top:16px"><canvas id="cdPieChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title"><span class="dot" style="background:var(--amber)"></span>By Sales Representative</div></div>
+          <table class="tbl" style="margin-top:10px">
+            <thead><tr><th>Employee</th><th>Total</th><th>Campaign</th><th>Camp %</th><th>Self</th><th>Self %</th></tr></thead>
+            <tbody>
+              ${owners.map(o=>`<tr>
+                <td style="color:var(--txt);font-weight:500">${o.name}</td>
+                <td style="color:var(--green);font-weight:600">${fmtN(o.total)}</td>
+                <td style="color:var(--blue)">${fmtN(o.campaign)}</td>
+                <td><div style="display:flex;align-items:center;gap:6px"><div style="background:rgba(59,130,246,.12);border-radius:3px;height:6px;width:60px"><div style="background:var(--blue);height:6px;border-radius:3px;width:${o.campaignPct}%"></div></div>${o.campaignPct}%</div></td>
+                <td style="color:var(--amber)">${fmtN(o.self)}</td>
+                <td><div style="display:flex;align-items:center;gap:6px"><div style="background:rgba(245,158,11,.12);border-radius:3px;height:6px;width:60px"><div style="background:var(--amber);height:6px;border-radius:3px;width:${o.selfPct}%"></div></div>${o.selfPct}%</div></td>
+              </tr>`).join('')}
+              <tr style="border-top:1px solid var(--border-md);font-weight:700;color:var(--txt)">
+                <td>TOTAL</td>
+                <td style="color:var(--green)">${fmtN(total)}</td>
+                <td style="color:var(--blue)">${fmtN(camp)}</td>
+                <td>${campPct}%</td>
+                <td style="color:var(--amber)">${fmtN(self)}</td>
+                <td>${selfPct}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><div class="card-title"><span class="dot" style="background:var(--purple)"></span>Closed Deals by Employee</div></div>
+        <div style="position:relative;height:280px"><canvas id="cdBarChart"></canvas></div>
+      </div>`;
+    setTimeout(()=>{
+      // Pie chart
+      const pie=document.getElementById('cdPieChart');
+      if(pie) charts.cdPie=new Chart(pie,{type:'doughnut',data:{labels:['Campaign','Self Prospecting'],datasets:[{data:[camp,self],backgroundColor:['#3b82f6','#f59e0b'],borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'58%',plugins:{legend:{position:'bottom',labels:{color:'#8892a4',font:{size:12},boxWidth:12,padding:16}}}}});
+      // Bar chart
+      const bar=document.getElementById('cdBarChart');
+      if(bar) charts.cdBar=new Chart(bar,{type:'bar',data:{labels:owners.map(o=>o.name),datasets:[{label:'Total Closed',data:owners.map(o=>o.total),backgroundColor:'#3b82f6',borderRadius:4},{label:'Campaign',data:owners.map(o=>o.campaign),backgroundColor:'#f59e0b',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8892a4',font:{size:12}}}},scales:{x:{ticks:{color:'#8892a4'},grid:{display:false}},y:{ticks:{color:'#8892a4'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+    },50);
+  }
   else if(activeSec==='trend'){
     const monthly=d.monthly||{}, mkeys=Object.keys(monthly).sort(), last12=mkeys.slice(-12);
     const thisM=monthly[last12[last12.length-1]]?.total||0, lastM=monthly[last12[last12.length-2]]?.total||0;

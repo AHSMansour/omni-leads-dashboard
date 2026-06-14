@@ -593,8 +593,9 @@ function render(){
     const totLeads = normCamps.reduce((s,c)=>s+c.total,0);
     const totPOS   = normCamps.reduce((s,c)=>s+c.pos,0);
     const totFin   = normCamps.reduce((s,c)=>s+c.financing,0);
-    const totCW    = normCamps.reduce((s,c)=>s+(c.closedWon||0),0);
-    const totDls   = normCamps.reduce((s,c)=>s+(c.dealsCreated||0),0);
+    // Use pipeline-level totals from server (Omni layout, date+owner filtered)
+    const totDls   = CAMPS.convertedDeals ?? normCamps.reduce((s,c)=>s+(c.dealsCreated||0),0);
+    const totCW    = CAMPS.closedWon      ?? normCamps.reduce((s,c)=>s+(c.closedWon||0),0);
     const totCWR   = totLeads?+(totCW/totLeads*100).toFixed(1):0;
 
     const srcTotals={}, stateTotals={};

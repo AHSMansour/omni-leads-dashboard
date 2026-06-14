@@ -22,6 +22,18 @@
   --purple:#8b5cf6;--purple-dim:rgba(139,92,246,.1);
   --omni-dark:#0d2818;--omni-green:#4ade80;--omni-deep:#1a3d28;
   --snap:#facc15;--r:8px;--rl:12px;--rxl:16px;
+  --card-bg:rgba(255,255,255,.03);--shadow:0 1px 3px rgba(0,0,0,.3);
+}
+/* ── LIGHT MODE ── */
+html.light{
+  --bg:#f0faf4;--surface:#ffffff;--panel:#f7fdf9;--hover:#e8f5ee;--active:#d6edd e;
+  --bg2:#f7fdf9;--bg3:#edf7f1;
+  --border:rgba(22,163,74,.1);--border-md:rgba(22,163,74,.18);--border-hi:rgba(22,163,74,.3);
+  --txt:#0d2818;--txt2:#2d6a4f;--txt3:#74b49b;
+  --accent:#16a34a;--accent-dim:rgba(22,163,74,.1);--accent-glow:rgba(22,163,74,.2);
+  --green:#16a34a;--green-dim:rgba(22,163,74,.1);
+  --omni-green:#16a34a;
+  --card-bg:#ffffff;--shadow:0 1px 4px rgba(0,0,0,.08);
 }
 html{scroll-behavior:smooth}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;font-size:13px;-webkit-font-smoothing:antialiased}
@@ -49,6 +61,11 @@ nav{flex:1;padding:4px 10px;overflow-y:auto}
 .btn-primary:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 4px 18px rgba(74,222,128,.35)}
 .btn-primary:active{transform:translateY(0)}
 .lu{font-size:10px;color:var(--txt3);text-align:center;margin-top:8px}
+/* ── Theme toggle ── */
+.theme-toggle{display:flex;align-items:center;background:var(--hover);border-radius:20px;padding:3px;gap:2px;border:1px solid var(--border-md);width:fit-content;margin:0 auto 10px}
+.theme-btn{width:28px;height:28px;border-radius:16px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;color:var(--txt3)}
+.theme-btn.active{background:var(--surface);color:var(--txt);box-shadow:var(--shadow)}
+.theme-btn svg{width:14px;height:14px}
 
 /* ── MAIN ── */
 .main{margin-left:232px;display:flex;flex-direction:column;min-height:100vh}
@@ -265,6 +282,14 @@ tfoot td:first-child{text-align:left;color:var(--blue)}
         <div class="u-name">Abdullah Hasan</div>
         <div class="u-role">Sales Team Lead</div>
       </div>
+    </div>
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnDark" onclick="setTheme('dark')" title="Dark mode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+      <button class="theme-btn" id="btnLight" onclick="setTheme('light')" title="Light mode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
     </div>
     <button class="btn-primary" onclick="loadData()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
@@ -898,6 +923,21 @@ function exportCSV(){
   a.download='campaigns_'+(campFilter||'all')+'_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
 }
+
+// ── Theme ──
+function setTheme(t){
+  const html = document.documentElement;
+  if(t==='light'){ html.classList.add('light'); }
+  else { html.classList.remove('light'); }
+  document.getElementById('btnDark').classList.toggle('active', t==='dark');
+  document.getElementById('btnLight').classList.toggle('active', t==='light');
+  try{ localStorage.setItem('omni-theme', t); }catch(e){}
+}
+// Restore saved theme
+try{
+  const saved = localStorage.getItem('omni-theme');
+  if(saved) setTheme(saved);
+}catch(e){}
 
 loadData();
 </script>

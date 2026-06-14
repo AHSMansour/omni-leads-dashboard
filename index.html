@@ -680,10 +680,10 @@ function render(){
     const active=activeStages.filter(([s])=>s!=='Closed Won'&&s!=='Closed Lost').reduce((s,[,v])=>s+v,0);
     document.getElementById('content').innerHTML=`
       <div class="kpis">
-        <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="k-lbl">Total Deals</div><div class="k-val" style="color:var(--blue)">${fmtN(d.dealsTotal)}</div></div>
-        <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="k-lbl">Closed Won</div><div class="k-val" style="color:var(--green)">${fmtN(cw)}</div><div class="k-sub">${d.dealsTotal?Math.round(cw/d.dealsTotal*100):0}% win rate</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="k-lbl">Total Deals</div><div class="k-val" style="color:var(--blue)">${fmtN(cw+cl+active)}</div><div class="k-sub">in selected period</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="k-lbl">Closed Won</div><div class="k-val" style="color:var(--green)">${fmtN(cw)}</div><div class="k-sub">${(cw+cl)>0?Math.round(cw/(cw+cl)*100):0}% win rate</div></div>
         <div class="kpi"><div class="kpi-accent" style="background:var(--red)"></div><div class="k-lbl">Closed Lost</div><div class="k-val" style="color:var(--red)">${fmtN(cl)}</div></div>
-        <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="k-lbl">Active Deals</div><div class="k-val" style="color:var(--amber)">${fmtN(active)}</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="k-lbl">Active Deals</div><div class="k-val" style="color:var(--amber)">${fmtN(active)}</div><div class="k-sub">current pipeline</div></div>
       </div>
       <div class="card" style="margin-bottom:14px">
         <div class="card-hd"><div class="card-title"><span class="dot" style="background:var(--amber)"></span>Pipeline Stages</div></div>

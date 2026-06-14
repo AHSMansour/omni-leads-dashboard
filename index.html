@@ -57,6 +57,31 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.4);cursor:poi
 .date-sep{font-size:11px;color:var(--txt3)}
 .btn-ghost{font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--border-md);background:transparent;color:var(--txt2);font-family:inherit;cursor:pointer;height:32px;transition:all .12s}
 .btn-ghost:hover{color:var(--txt);border-color:var(--border-hi)}
+/* ── Multi-select owner dropdown ── */
+.ms-wrap{position:relative}
+.ms-btn{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:var(--r);border:1px solid var(--border-md);background:var(--bg2);color:var(--txt2);font-family:inherit;font-size:13px;cursor:pointer;transition:all .12s;white-space:nowrap;min-width:130px;justify-content:space-between}
+.ms-btn:hover,.ms-btn.open{border-color:var(--accent);color:var(--txt)}
+.ms-btn.active{border-color:var(--accent);color:var(--txt);background:rgba(59,130,246,.08)}
+.ms-btn svg{opacity:.5;flex-shrink:0;transition:transform .15s}
+.ms-btn.open svg{transform:rotate(180deg);opacity:1}
+.ms-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--bg2);border:1px solid var(--border-hi);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);width:220px;overflow:hidden}
+.ms-dropdown.show{display:block}
+.ms-search-wrap{padding:8px 8px 6px}
+.ms-search{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border-md);border-radius:6px;color:var(--txt);font-size:12px;padding:5px 8px;outline:none;font-family:inherit}
+.ms-search:focus{border-color:var(--accent)}
+.ms-list{max-height:220px;overflow-y:auto;padding:2px 0}
+.ms-list::-webkit-scrollbar{width:4px}.ms-list::-webkit-scrollbar-track{background:transparent}.ms-list::-webkit-scrollbar-thumb{background:var(--border-md);border-radius:2px}
+.ms-item{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px;color:var(--txt2);transition:background .1s}
+.ms-item:hover{background:rgba(255,255,255,.05);color:var(--txt)}
+.ms-item.checked{color:var(--txt)}
+.ms-checkbox{width:14px;height:14px;border:1.5px solid var(--border-hi);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.ms-item.checked .ms-checkbox{background:var(--accent);border-color:var(--accent)}
+.ms-item.checked .ms-checkbox::after{content:'';width:8px;height:5px;border-left:1.5px solid #fff;border-bottom:1.5px solid #fff;transform:rotate(-45deg) translateY(-1px)}
+.ms-footer{display:flex;gap:6px;padding:8px;border-top:1px solid var(--border-md)}
+.ms-clear{flex:1;padding:5px;border-radius:5px;border:1px solid var(--border-md);background:transparent;color:var(--txt2);font-size:12px;cursor:pointer;font-family:inherit;transition:all .12s}
+.ms-clear:hover{border-color:var(--border-hi);color:var(--txt)}
+.ms-apply{flex:2;padding:5px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity .12s}
+.ms-apply:hover{opacity:.85}
 .btn-export{font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid rgba(16,185,129,.3);background:rgba(16,185,129,.08);color:var(--green);font-family:inherit;cursor:pointer;height:32px;display:flex;align-items:center;gap:5px;transition:all .12s}
 .btn-export:hover{background:rgba(16,185,129,.15)}
 
@@ -231,9 +256,20 @@ tfoot td:first-child{text-align:left;color:var(--blue)}
         <option value="POS">POS only</option>
         <option value="Financing">Financing only</option>
       </select>
-      <select id="fOwner" onchange="applyFilters()">
-        <option value="">All Owners</option>
-      </select>
+      <div class="ms-wrap" id="ownerWrap">
+        <button class="ms-btn" id="ownerBtn" onclick="toggleOwnerDD(event)">
+          <span id="ownerLabel">All Owners</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="ms-dropdown" id="ownerDD">
+          <div class="ms-search-wrap"><input class="ms-search" id="ownerSearch" placeholder="Search owners…" oninput="filterOwnerList(this.value)"/></div>
+          <div class="ms-list" id="ownerList"></div>
+          <div class="ms-footer">
+            <button class="ms-clear" onclick="clearOwners()">Clear</button>
+            <button class="ms-apply" onclick="applyOwners()">Apply</button>
+          </div>
+        </div>
+      </div>
       <span class="date-sep">From</span>
       <input type="date" id="fDateFrom" onchange="applyFilters()"/>
       <span class="date-sep">To</span>
@@ -311,7 +347,8 @@ function buildParams(){
   const v = id => document.getElementById(id)?.value||'';
   if(v('fSrc'))      p.set('source',v('fSrc'));
   if(v('fType'))     p.set('type',v('fType'));
-  if(v('fOwner'))    p.set('owner',v('fOwner'));
+  if(selectedOwners.length===1) p.set('owner',selectedOwners[0]);
+  else if(selectedOwners.length>1) p.set('owners',selectedOwners.join(','));
   if(v('fDateFrom')) p.set('dateFrom',v('fDateFrom'));
   if(v('fDateTo'))   p.set('dateTo',v('fDateTo'));
   return p.toString()?'?'+p.toString():'';
@@ -329,10 +366,9 @@ async function loadData(){
     if(!r1.ok) throw new Error('Stats HTTP '+r1.status);
     RAW = await r1.json();
     CAMPS = await r2.json();
-    // Owners
-    const sel=document.getElementById('fOwner'), cur=sel.value;
+    // Owners - multi select
     const owners=Object.keys(RAW.byOwner||{}).sort((a,b)=>RAW.byOwner[b]-RAW.byOwner[a]);
-    sel.innerHTML='<option value="">All Owners</option>'+owners.map(o=>`<option${o===cur?' selected':''}>${o}</option>`).join('');
+    populateOwnerList(owners);
     document.getElementById('lastUpdate').textContent=new Date(RAW.generatedAt).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     campFilter='';
     render();
@@ -343,9 +379,79 @@ async function loadData(){
   }
 }
 
+// ── Multi-select owners ──
+let selectedOwners = [], allOwnerNames = [];
+
+function populateOwnerList(owners){
+  allOwnerNames = owners;
+  renderOwnerItems(owners);
+}
+
+function renderOwnerItems(list){
+  const el = document.getElementById('ownerList');
+  if(!el) return;
+  el.innerHTML = list.map(o => {
+    const checked = selectedOwners.includes(o);
+    return `<div class="ms-item${checked?' checked':''}" onclick="toggleOwner('${o.replace(/'/g,"\'")}',this)">
+      <div class="ms-checkbox"></div><span>${o}</span>
+    </div>`;
+  }).join('');
+}
+
+function filterOwnerList(q){
+  const filtered = allOwnerNames.filter(o=>o.toLowerCase().includes(q.toLowerCase()));
+  renderOwnerItems(filtered);
+}
+
+function toggleOwner(name, el){
+  if(selectedOwners.includes(name)) selectedOwners = selectedOwners.filter(o=>o!==name);
+  else selectedOwners.push(name);
+  el.classList.toggle('checked', selectedOwners.includes(name));
+  updateOwnerLabel();
+}
+
+function updateOwnerLabel(){
+  const lbl = document.getElementById('ownerLabel');
+  const btn = document.getElementById('ownerBtn');
+  if(selectedOwners.length===0){ lbl.textContent='All Owners'; btn.classList.remove('active'); }
+  else if(selectedOwners.length===1){ lbl.textContent=selectedOwners[0]; btn.classList.add('active'); }
+  else{ lbl.textContent=selectedOwners.length+' Owners'; btn.classList.add('active'); }
+}
+
+function clearOwners(reload=true){
+  selectedOwners=[];
+  updateOwnerLabel();
+  renderOwnerItems(allOwnerNames);
+  if(reload) loadData();
+}
+
+function applyOwners(){
+  document.getElementById('ownerDD').classList.remove('show');
+  document.getElementById('ownerBtn').classList.remove('open');
+  loadData();
+}
+
+function toggleOwnerDD(e){
+  e.stopPropagation();
+  const dd=document.getElementById('ownerDD');
+  const btn=document.getElementById('ownerBtn');
+  const isOpen=dd.classList.contains('show');
+  document.querySelectorAll('.ms-dropdown').forEach(d=>d.classList.remove('show'));
+  document.querySelectorAll('.ms-btn').forEach(b=>b.classList.remove('open'));
+  if(!isOpen){ dd.classList.add('show'); btn.classList.add('open'); }
+  const si=document.getElementById('ownerSearch'); if(si){si.value='';filterOwnerList('');}
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#ownerWrap')){
+    document.getElementById('ownerDD')?.classList.remove('show');
+    document.getElementById('ownerBtn')?.classList.remove('open');
+  }
+});
+
 function applyFilters(){ loadData(); }
 function clearFilters(){
-  ['fSrc','fType','fOwner'].forEach(id=>{document.getElementById(id).value='';});
+  ['fSrc','fType'].forEach(id=>{document.getElementById(id).value='';}); clearOwners(false);
   ['fDateFrom','fDateTo'].forEach(id=>{document.getElementById(id).value='';});
   loadData();
 }

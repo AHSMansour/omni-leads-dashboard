@@ -57,6 +57,15 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.4);cursor:poi
 .date-sep{font-size:11px;color:var(--txt3)}
 .btn-ghost{font-size:12px;padding:5px 12px;border-radius:var(--r);border:1px solid var(--border-md);background:transparent;color:var(--txt2);font-family:inherit;cursor:pointer;height:32px;transition:all .12s}
 .btn-ghost:hover{color:var(--txt);border-color:var(--border-hi)}
+/* Campaign table enhancements */
+.camp-tbl thead tr.thead-group th{text-align:center;font-size:10px;letter-spacing:.08em;padding:10px 8px 6px;background:var(--bg3)}
+.camp-tbl thead tr:nth-child(2) th{background:rgba(255,255,255,.03);padding:6px 8px}
+.camp-tbl .tr-alt{background:rgba(255,255,255,.018)}
+.camp-tbl .tr-alt td{background:rgba(255,255,255,.018)!important}
+.camp-tbl tbody tr:hover td{background:rgba(59,130,246,.06)!important}
+.camp-tbl tfoot tr td{background:var(--bg3);border-top:2px solid var(--border-hi);padding:10px 10px;font-size:12px}
+.num{text-align:right;padding:7px 10px;font-size:12px;font-variant-numeric:tabular-nums}
+.dim{color:var(--txt3)!important;opacity:.4;font-size:11px}
 /* ── Multi-select owner dropdown ── */
 .ms-wrap{position:relative}
 .ms-btn{display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:var(--r);border:1px solid var(--border-md);background:var(--bg2);color:var(--txt2);font-family:inherit;font-size:13px;cursor:pointer;transition:all .12s;white-space:nowrap;min-width:130px;justify-content:space-between}
@@ -519,29 +528,65 @@ function render(){
     let camps = CAMPS.campaigns||[];
     if(campFilter) camps = camps.filter(c=>c.name===campFilter);
 
-    const allSources = [...new Set((CAMPS.campaigns||[]).flatMap(c=>Object.keys(c.bySource||{})))].sort();
+    // Fixed ordered sources (canonical names)
+    const FIXED_SOURCES = [
+      'Snapchat','TikTok','Meta Ads','Omni Website',
+      'WhatsApp Ads','WhatsApp Organic','Yallaomni-Web',
+      'Omni Financing Awareness','New Request from omni website',
+      'Monshaat','Mowaridi','Google Ads','Referral','Resellers'
+    ];
+    // Map variant names → canonical
+    const SRC_ALIAS = {
+      'Facebook&Instagram':'Meta Ads','META':'Meta Ads','Facebook&instagram':'Meta Ads',
+      'WhatsApp':'WhatsApp Organic','Omni-Web':'Yallaomni-Web',
+      'External Referral':'Referral','Employee Referral':'Referral',
+      'New request from omni website':'New Request from omni website',
+    };
+    // Normalize source name
+    const normSrc = s => SRC_ALIAS[s] || s;
+
+    // Build normalized bySource per campaign
+    const normCamps = camps.map(c => {
+      const nb = {};
+      Object.entries(c.bySource||{}).forEach(([s,v]) => {
+        const n = normSrc(s);
+        nb[n] = (nb[n]||0) + v;
+      });
+      return {...c, normSource: nb};
+    });
+
+    // Only show sources that have at least 1 lead across all camps
+    const activeSources = FIXED_SOURCES.filter(s => normCamps.some(c=>(c.normSource[s]||0)>0));
+
     const allStates  = STATES.filter(st=>camps.some(c=>(c.byState||{})[st]>0));
-    // Opportunity stages — collect from all campaigns' deal stages
     const OPP_STAGES = ['Qualified','Pitching','Negotiation','Nurturing','Commitment','Closed Won','Closed Lost'];
-    const activeOppStages = OPP_STAGES;
 
     // Totals
-    const totLeads = camps.reduce((s,c)=>s+c.total,0);
-    const totPOS   = camps.reduce((s,c)=>s+c.pos,0);
-    const totFin   = camps.reduce((s,c)=>s+c.financing,0);
-    const totCW    = camps.reduce((s,c)=>s+(c.closedWon||0),0);
-    const totDls   = camps.reduce((s,c)=>s+(c.dealsCreated||0),0);
+    const totLeads = normCamps.reduce((s,c)=>s+c.total,0);
+    const totPOS   = normCamps.reduce((s,c)=>s+c.pos,0);
+    const totFin   = normCamps.reduce((s,c)=>s+c.financing,0);
+    const totCW    = normCamps.reduce((s,c)=>s+(c.closedWon||0),0);
+    const totDls   = normCamps.reduce((s,c)=>s+(c.dealsCreated||0),0);
     const totCWR   = totLeads?+(totCW/totLeads*100).toFixed(1):0;
 
     const srcTotals={}, stateTotals={};
-    allSources.forEach(s=>{ srcTotals[s]=camps.reduce((t,c)=>t+((c.bySource||{})[s]||0),0); });
-    allStates.forEach(s=>{ stateTotals[s]=camps.reduce((t,c)=>t+((c.byState||{})[s]||0),0); });
+    activeSources.forEach(s=>{ srcTotals[s]=normCamps.reduce((t,c)=>t+(c.normSource[s]||0),0); });
+    allStates.forEach(s=>{ stateTotals[s]=normCamps.reduce((t,c)=>t+((c.byState||{})[s]||0),0); });
+
+    // Source color map
+    const SRC_COL = {
+      'Snapchat':'#facc15','TikTok':'#3b82f6','Meta Ads':'#818cf8',
+      'Omni Website':'#8b5cf6','WhatsApp Ads':'#10b981','WhatsApp Organic':'#059669',
+      'Yallaomni-Web':'#0ea5e9','Omni Financing Awareness':'#f59e0b',
+      'New Request from omni website':'#06b6d4','Monshaat':'#fb923c',
+      'Mowaridi':'#f97316','Google Ads':'#f43f5e','Referral':'#64748b','Resellers':'#94a3b8'
+    };
 
     document.getElementById('content').innerHTML=`
       <div class="kpis">
         <div class="kpi"><div class="kpi-accent" style="background:var(--blue)"></div><div class="k-lbl">Campaigns</div><div class="k-val" style="color:var(--blue)">${campFilter?1:CAMPS.campaignCount}</div><div class="k-sub">${fmtN(totLeads)} total leads</div></div>
-        <div class="kpi"><div class="kpi-accent" style="background:var(--teal)"></div><div class="k-lbl">POS Leads</div><div class="k-val" style="color:var(--teal)">${fmtN(totPOS)}</div><div class="k-sub">${totLeads?Math.round(totPOS/totLeads*100):0}%</div></div>
-        <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="k-lbl">Financing Leads</div><div class="k-val" style="color:var(--amber)">${fmtN(totFin)}</div><div class="k-sub">${totLeads?Math.round(totFin/totLeads*100):0}%</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--teal)"></div><div class="k-lbl">POS Leads</div><div class="k-val" style="color:var(--teal)">${fmtN(totPOS)}</div><div class="k-sub">${totLeads?Math.round(totPOS/totLeads*100):0}% of total</div></div>
+        <div class="kpi"><div class="kpi-accent" style="background:var(--amber)"></div><div class="k-lbl">Financing Leads</div><div class="k-val" style="color:var(--amber)">${fmtN(totFin)}</div><div class="k-sub">${totLeads?Math.round(totFin/totLeads*100):0}% of total</div></div>
         <div class="kpi"><div class="kpi-accent" style="background:var(--purple)"></div><div class="k-lbl">Converted → Deal</div><div class="k-val" style="color:var(--purple)">${fmtN(totDls)}</div><div class="k-sub">${totLeads?Math.round(totDls/totLeads*100):0}% deal rate</div></div>
         <div class="kpi"><div class="kpi-accent" style="background:var(--green)"></div><div class="k-lbl">Closed Won</div><div class="k-val" style="color:var(--green)">${fmtN(totCW)}</div><div class="k-sub">Conv. rate: ${totCWR}%</div></div>
       </div>
@@ -556,63 +601,60 @@ function render(){
             </button>
           </div>
         </div>
-        <div style="font-size:11px;color:var(--txt3);margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap">
+        <div style="font-size:11px;color:var(--txt3);margin-bottom:14px;display:flex;gap:20px;flex-wrap:wrap;padding:10px 12px;background:rgba(255,255,255,.03);border-radius:6px;border:1px solid var(--border-md)">
           <span><span style="color:var(--purple)">●</span> Converted = leads moved to Deals in Opportunities module</span>
           <span><span style="color:var(--green)">●</span> Closed Won = Deals at Closed Won stage</span>
           <span><span style="color:var(--amber)">●</span> Conv. Rate = Closed Won ÷ Total Leads</span>
         </div>
-        <div class="tbl-wrap"><table id="campTable">
+        <div class="tbl-wrap"><table id="campTable" class="camp-tbl">
           <thead>
             <tr class="thead-group">
-              <th style="text-align:left">CAMPAIGN</th>
-              <th></th>
-              <th colspan="${allSources.length}" style="color:var(--teal)">LEAD SOURCE</th>
-              <th colspan="${allStates.length}" style="color:var(--purple)">LEAD STATUS</th>
-              <th colspan="${activeOppStages.length}" style="color:var(--green)">OPPORTUNITY STAGE</th>
-              <th></th><th></th><th></th>
+              <th rowspan="2" style="text-align:left;vertical-align:middle;min-width:180px;position:sticky;left:0;z-index:3;background:var(--bg3)">CAMPAIGN</th>
+              <th rowspan="2" style="vertical-align:middle;min-width:80px">TOTAL<br>LEADS</th>
+              <th colspan="${activeSources.length}" style="color:var(--teal);border-bottom:2px solid rgba(20,184,166,.3)">LEAD SOURCE</th>
+              <th colspan="${allStates.length}" style="color:var(--purple);border-bottom:2px solid rgba(139,92,246,.3)">LEAD STATUS</th>
+              <th colspan="${OPP_STAGES.length}" style="color:var(--green);border-bottom:2px solid rgba(16,185,129,.3)">OPPORTUNITY STAGE</th>
+              <th rowspan="2" style="vertical-align:middle;color:var(--purple);min-width:80px">CONV.<br>DEAL</th>
+              <th rowspan="2" style="vertical-align:middle;color:var(--green);min-width:80px">CLOSED<br>WON</th>
+              <th rowspan="2" style="vertical-align:middle;color:var(--amber);min-width:90px">CONV.<br>RATE</th>
             </tr>
             <tr>
-              <th style="text-align:left;min-width:200px">Campaign</th>
-              <th>Total Leads</th>
-              ${allSources.map(s=>`<th style="color:${SRC_COLORS[s]||'#8b92a8'}">${s}</th>`).join('')}
-              ${allStates.map(s=>`<th><span class="badge ${bc(s)}" style="font-size:9px">${s}</span></th>`).join('')}
-              ${activeOppStages.map(s=>`<th style="color:${PIPE_COLORS[s]||'#8b92a8'};font-size:9px">${s}</th>`).join('')}
-              <th style="color:var(--purple)">Converted</th>
-              <th style="color:var(--green)">Closed Won</th>
-              <th style="color:var(--amber)">Conv. Rate</th>
+              ${activeSources.map(s=>`<th style="color:${SRC_COL[s]||'#8b92a8'};font-size:9px;white-space:nowrap;padding:4px 8px">${s}</th>`).join('')}
+              ${allStates.map(s=>`<th style="font-size:9px;white-space:nowrap;padding:4px 6px"><span class="badge ${bc(s)}" style="font-size:9px;padding:2px 5px">${s}</span></th>`).join('')}
+              ${OPP_STAGES.map(s=>`<th style="color:${PIPE_COLORS[s]||'#8b92a8'};font-size:9px;white-space:nowrap;padding:4px 6px">${s}</th>`).join('')}
             </tr>
           </thead>
           <tbody>
-            ${camps.map(c=>{
+            ${normCamps.map((c,i)=>{
               const cwr=c.closedWonRate||0;
               const cwc=rateColor(cwr);
-              return `<tr>
-                <td style="font-weight:500;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.name}">${c.name}</td>
-                <td class="num" style="font-weight:600;color:var(--blue)">${fmtN(c.total)}</td>
-                ${allSources.map(s=>cell((c.bySource||{})[s]||0)).join('')}
-                ${allStates.map(s=>cell((c.byState||{})[s]||0)).join('')}
-                ${activeOppStages.map(s=>cell((c.byStage||{})[s]||0)).join('')}
-                <td class="num" style="color:var(--purple);font-weight:600">${fmtN(c.dealsCreated||0)}</td>
-                <td class="num" style="color:var(--green);font-weight:600">${fmtN(c.closedWon||0)}</td>
+              return `<tr class="${i%2===0?'':'tr-alt'}">
+                <td style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;position:sticky;left:0;background:${i%2===0?'var(--bg2)':'rgba(255,255,255,.02)'};z-index:2" title="${c.name}">${c.name}</td>
+                <td class="num" style="font-weight:700;color:var(--blue);font-size:14px">${fmtN(c.total)}</td>
+                ${activeSources.map(s=>{const v=c.normSource[s]||0;return v?`<td class="num" style="color:${SRC_COL[s]||'var(--txt2)'}">${fmtN(v)}</td>`:`<td class="num dim">—</td>`;}).join('')}
+                ${allStates.map(s=>{const v=(c.byState||{})[s]||0;return v?`<td class="num">${fmtN(v)}</td>`:`<td class="num dim">—</td>`;}).join('')}
+                ${OPP_STAGES.map(s=>{const v=(c.byStage||{})[s]||0;return v?`<td class="num" style="color:${PIPE_COLORS[s]||'var(--txt2)'};font-weight:600">${fmtN(v)}</td>`:`<td class="num dim">—</td>`;}).join('')}
+                <td class="num" style="color:var(--purple);font-weight:700">${fmtN(c.dealsCreated||0)||'—'}</td>
+                <td class="num" style="color:var(--green);font-weight:700">${fmtN(c.closedWon||0)||'—'}</td>
                 <td>
                   <div class="rate-wrap">
                     <div class="rate-bar"><div class="rate-fill" style="width:${Math.min(cwr*5,100)}%;background:${cwc}"></div></div>
-                    <span class="rate-pct" style="color:${cwc}">${cwr}%</span>
+                    <span class="rate-pct" style="color:${cwc};font-weight:600">${cwr}%</span>
                   </div>
                 </td>
               </tr>`;
             }).join('')}
           </tbody>
           <tfoot>
-            <tr>
-              <td>TOTAL</td>
-              <td style="color:var(--blue)">${fmtN(totLeads)}</td>
-              ${allSources.map(s=>`<td>${fmtN(srcTotals[s]||0)}</td>`).join('')}
+            <tr style="font-weight:700;font-size:13px">
+              <td style="position:sticky;left:0;background:var(--bg3);z-index:2;color:var(--txt)">TOTAL</td>
+              <td style="color:var(--blue);font-size:15px">${fmtN(totLeads)}</td>
+              ${activeSources.map(s=>`<td style="color:${SRC_COL[s]||'var(--txt2)'}">${fmtN(srcTotals[s]||0)}</td>`).join('')}
               ${allStates.map(s=>`<td>${fmtN(stateTotals[s]||0)}</td>`).join('')}
-              ${activeOppStages.map(s=>`<td style="font-weight:600">${fmtN(camps.reduce((t,c)=>t+((c.byStage||{})[s]||0),0))}</td>`).join('')}
+              ${OPP_STAGES.map(s=>`<td style="color:${PIPE_COLORS[s]||'var(--txt2)'}">${fmtN(normCamps.reduce((t,c)=>t+((c.byStage||{})[s]||0),0))}</td>`).join('')}
               <td style="color:var(--purple)">${fmtN(totDls)}</td>
               <td style="color:var(--green)">${fmtN(totCW)}</td>
-              <td><span class="rate-pct" style="color:${rateColor(totCWR)}">${totCWR}%</span></td>
+              <td><span class="rate-pct" style="color:${rateColor(totCWR)};font-size:13px">${totCWR}%</span></td>
             </tr>
           </tfoot>
         </table></div>
@@ -814,10 +856,14 @@ function exportCSV(){
   if(!CAMPS) return;
   let camps = CAMPS.campaigns||[];
   if(campFilter) camps = camps.filter(c=>c.name===campFilter);
-  const allSources=[...new Set(camps.flatMap(c=>Object.keys(c.bySource||{})))].sort();
+  const FIXED_SOURCES_EXP = ['Snapchat','TikTok','Meta Ads','Omni Website','WhatsApp Ads','WhatsApp Organic','Yallaomni-Web','Omni Financing Awareness','New Request from omni website','Monshaat','Mowaridi','Google Ads','Referral','Resellers'];
+  const SRC_ALIAS_EXP = {'Facebook&Instagram':'Meta Ads','META':'Meta Ads','WhatsApp':'WhatsApp Organic','External Referral':'Referral','Employee Referral':'Referral'};
+  const normSrcExp = s => SRC_ALIAS_EXP[s] || s;
+  const normCampsExp = camps.map(c => { const nb={}; Object.entries(c.bySource||{}).forEach(([s,v])=>{const n=normSrcExp(s);nb[n]=(nb[n]||0)+v;}); return {...c,normSource:nb}; });
+  const allSources = FIXED_SOURCES_EXP.filter(s=>normCampsExp.some(c=>(c.normSource[s]||0)>0));
   const allStates=STATES.filter(st=>camps.some(c=>(c.byState||{})[st]>0));
   const headers=['Campaign','Total Leads','POS','Financing',...allSources,...allStates,'Converted (Deal)','Closed Won','Conv. Rate %'];
-  const rows=camps.map(c=>[c.name,c.total,c.pos,c.financing,...allSources.map(s=>(c.bySource||{})[s]||0),...allStates.map(s=>(c.byState||{})[s]||0),c.dealsCreated||0,c.closedWon||0,c.closedWonRate||0]);
+  const rows=normCampsExp.map(c=>[c.name,c.total,c.pos,c.financing,...allSources.map(s=>(c.normSource||{})[s]||0),...allStates.map(s=>(c.byState||{})[s]||0),c.dealsCreated||0,c.closedWon||0,c.closedWonRate||0]);
   const csv=[headers,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
   const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download='campaigns_'+(campFilter||'all')+'_'+new Date().toISOString().slice(0,10)+'.csv';
